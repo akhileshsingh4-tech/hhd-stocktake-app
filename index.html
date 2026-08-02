@@ -31,6 +31,7 @@
   #qrcode img, #qrcode canvas { image-rendering: pixelated; display: block; margin: 0 auto; }
   .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; padding: 20px; z-index: 999; }
   .modal { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 14px; padding: 22px; width: 100%; max-width: 380px; text-align: center; }
+  .time-stamp { font-size: 11px; color: #8888aa; margin-top: 14px; font-family: monospace; }
 </style>
 </head>
 <body>
@@ -46,6 +47,7 @@
     </div>
     <div class="alert alert-error" id="loginAlert" style="margin-top:12px;"></div>
     <button class="btn btn-primary" style="margin-top:16px;" id="startBtn" onclick="doLogin()">Start Audit</button>
+    <div class="time-stamp">🕒 GitHub Updated: 02/08/2026, 08:25 PM</div>
   </div>
 </div>
 
@@ -136,7 +138,7 @@
 </div>
 
 <script>
-const EMP_DATA = {"1234":[{"tid":"TK-20260802-G06","wid":"XIBQD1H","model":"Mi Mi 10T","location":"GRD1109D6","expectedCount":1,"wsns":["0L463V_I"]},{"tid":"TK-20260802-G06","wid":"XIBW838","model":"vivo V21 5G","location":"GRD1109D6","expectedCount":1,"wsns":["0WVO5N_X"]}]};
+const EMP_DATA = {"234":[{"tid":"TK-20260802-G07","wid":"XIMYIJ7","model":"Mi Redmi Note 9 Pro","location":"GRD1109D6","expectedCount":1,"wsns":["2CJG43_D"]}],"1234":[{"tid":"TK-20260802-G08","wid":"XIMYX3B","model":"realme 9i","location":"GRD1109D6","expectedCount":2,"wsns":["2092X5_N","1MJZ9C_B"]}]};
 let currentEmp = '';
 let assignments = [];
 let currentIdx = 0;
