@@ -42,7 +42,7 @@
     <p style="font-size:13px; color:#8888aa; margin-bottom:20px;">Enter Employee Code to start</p>
     <div style="text-align:left;">
       <div class="label">Employee Code / ID</div>
-      <input type="text" id="empInput" placeholder="e.g. 3895520" autocomplete="off">
+      <input type="text" id="empInput" placeholder="e.g. 12345" autocomplete="off">
     </div>
     <div class="alert alert-error" id="loginAlert" style="margin-top:12px;"></div>
     <button class="btn btn-primary" style="margin-top:16px;" id="startBtn" onclick="doLogin()">Start Audit</button>
@@ -136,10 +136,7 @@
 </div>
 
 <script>
-// PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW:
-const API_URL = "https://script.google.com/a/macros/flipkart.com/s/AKfycbzKZ69yArMwfshq0pIWZCb8Uvf4bPg2YUXByFHqVtUPkiKKnq87WFoePl3g0wRmjY4GBQ/exec";
-
-let EMP_DATA = {};
+const EMP_DATA = {"1234":[{"tid":"TK-20260802-G01","wid":"XIN0728","model":"vivo T2x 5G","location":"GRD1109B1","expectedCount":1,"wsns":["20DE9J_H"]},{"tid":"TK-20260802-G01","wid":"XIPTSQ9","model":"Apple iPhone 15","location":"GRD1109B1","expectedCount":1,"wsns":["2DEIB7_T"]},{"tid":"TK-20260802-G01","wid":"XIIVRDJ","model":"SAMSUNG Galaxy A14 5G","location":"GRD1109C1","expectedCount":1,"wsns":["1FVMZP_H"]},{"tid":"TK-20260802-G01","wid":"XIMWVFH","model":"OnePlus Nord 2T 5G","location":"GRD1109D1","expectedCount":1,"wsns":["1IFPTQ_D"]},{"tid":"TK-20260802-G01","wid":"XIN0I7A","model":"Mi Redmi K50i 5G","location":"GRD1109D1","expectedCount":1,"wsns":["1H1W2X_X"]}]};
 let currentEmp = '';
 let assignments = [];
 let currentIdx = 0;
@@ -155,46 +152,10 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
-function fetchSheetDataJSONP(url) {
-  return new Promise((resolve, reject) => {
-    const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
-    window[callbackName] = function(data) {
-      delete window[callbackName];
-      document.body.removeChild(script);
-      resolve(data);
-    };
-
-    const script = document.createElement('script');
-    const delimiter = url.indexOf('?') >= 0 ? '&' : '?';
-    script.src = url + delimiter + 'callback=' + callbackName;
-    script.onerror = function() {
-      delete window[callbackName];
-      document.body.removeChild(script);
-      reject(new Error('JSONP request failed'));
-    };
-    document.body.appendChild(script);
-  });
-}
-
-async function doLogin() {
+function doLogin() {
   const inputEl = document.getElementById('empInput');
   const code = inputEl.value.trim().toUpperCase();
   if (!code) return showLoginErr('Please enter Employee ID');
-
-  const btn = document.getElementById('startBtn');
-  btn.textContent = 'Loading Assignments...';
-  btn.disabled = true;
-
-  try {
-    EMP_DATA = await fetchSheetDataJSONP(API_URL);
-  } catch(e) {
-    btn.textContent = 'Start Audit';
-    btn.disabled = false;
-    return showLoginErr('Failed to connect to Google Sheets server.');
-  }
-
-  btn.textContent = 'Start Audit';
-  btn.disabled = false;
 
   if (!EMP_DATA || !EMP_DATA[code] || !EMP_DATA[code].length) {
     return showLoginErr('No active Stock Take assigned to Employee: ' + code);
@@ -232,6 +193,7 @@ async function doLogin() {
   showScreen('screen-audit');
   loadCurrentItem();
 }
+
 function saveLocalSession() {
   const dataToSave = {
     currentIdx: currentIdx,
