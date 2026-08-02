@@ -155,6 +155,27 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
+function fetchSheetDataJSONP(url) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'jsonp_cb_' + Math.round(100000 * Math.random());
+    window[callbackName] = function(data) {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      resolve(data);
+    };
+
+    const script = document.createElement('script');
+    const delimiter = url.indexOf('?') >= 0 ? '&' : '?';
+    script.src = url + delimiter + 'callback=' + callbackName;
+    script.onerror = function() {
+      delete window[callbackName];
+      document.body.removeChild(script);
+      reject(new Error('JSONP request failed'));
+    };
+    document.body.appendChild(script);
+  });
+}
+
 async function doLogin() {
   const inputEl = document.getElementById('empInput');
   const code = inputEl.value.trim().toUpperCase();
@@ -165,8 +186,7 @@ async function doLogin() {
   btn.disabled = true;
 
   try {
-    const res = await fetch(API_URL);
-    EMP_DATA = await res.json();
+    EMP_DATA = await fetchSheetDataJSONP(API_URL);
   } catch(e) {
     btn.textContent = 'Start Audit';
     btn.disabled = false;
@@ -212,7 +232,6 @@ async function doLogin() {
   showScreen('screen-audit');
   loadCurrentItem();
 }
-
 function saveLocalSession() {
   const dataToSave = {
     currentIdx: currentIdx,
