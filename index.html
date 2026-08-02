@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HHD Stock Take</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: #0f0f1a; color: #e8e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
+  .screen { width: 100%; max-width: 440px; display: none; flex-direction: column; gap: 16px; }
+  .screen.active { display: flex; }
+  .card { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 14px; padding: 20px; }
+  .label { font-size: 11px; color: #8888aa; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .val { font-size: 22px; font-weight: 800; color: #f7a34f; letter-spacing: 1px; font-family: 'Courier New', monospace; }
+  .model-val { font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 12px; }
+  .tid-badge { background: rgba(79, 142, 247, 0.15); border: 1px solid #4f8ef7; border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #4f8ef7; font-family: monospace; display: inline-block; margin-bottom: 12px; }
+  input { width: 100%; background: #0f0f1a; border: 2px solid #2a2a45; border-radius: 10px; color: white; font-size: 18px; padding: 12px 14px; outline: none; font-weight: 600; }
+  input:focus { border-color: #4f8ef7; }
+  .btn { width: 100%; padding: 14px; border-radius: 10px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform 0.1s; }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: #4f8ef7; color: white; }
+  .btn-success { background: #4fd97e; color: #0f0f1a; }
+  .btn-danger { background: #f75f5f; color: white; }
+  .btn-warn { background: #f7a34f; color: #0f0f1a; }
+  .btn-ghost { background: #252540; color: white; }
+  .alert { padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; display: none; }
+  .alert-error { background: rgba(247,95,95,0.2); border: 1px solid #f75f5f; color: #f75f5f; }
+  .alert-success { background: rgba(79,217,126,0.2); border: 1px solid #4fd97e; color: #4fd97e; }
+  .barcode-wrap { background: #ffffff; padding: 24px; border-radius: 16px; display: flex; justify-content: center; align-items: center; margin: 16px 0; border: 4px solid #ffffff; }
+  #qrcode img, #qrcode canvas { image-rendering: pixelated; display: block; margin: 0 auto; }
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; padding: 20px; z-index: 999; }
+  .modal { background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 14px; padding: 22px; width: 100%; max-width: 380px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="screen active" id="screen-login">
+  <div class="card" style="text-align:center;">
+    <h1 style="font-size:22px; margin-bottom:6px;">📦 Stock Take HHD</h1>
+    <p style="font-size:13px; color:#8888aa; margin-bottom:20px;">Enter Employee Code to start</p>
+    <div style="text-align:left;">
+      <div class="label">Employee Code / ID</div>
+      <input type="text" id="empInput" placeholder="e.g. 3895520" autocomplete="off">
+    </div>
+    <div class="alert alert-error" id="loginAlert" style="margin-top:12px;"></div>
+    <button class="btn btn-primary" style="margin-top:16px;" id="startBtn" onclick="doLogin()">Start Audit</button>
+  </div>
+</div>
+
+<!-- AUDIT SCREEN -->
+<div class="screen" id="screen-audit">
+  <div class="card">
+    <div class="tid-badge" id="dispTid">ST-0000</div>
+    
+    <div class="label">Location</div>
+    <div class="val" id="dispLoc" style="color:#f7a34f; margin-bottom:12px;">-</div>
+
+    <div class="label">Model</div>
+    <div class="model-val" id="dispModel">-</div>
+
+    <div class="label">WID</div>
+    <div class="val" id="dispWid" style="color:#4f8ef7; margin-bottom:12px;">-</div>
+
+    <div class="label">Count Progress</div>
+    <div class="val" id="dispCount" style="color:#ffffff;">0 / 0</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Scan / Enter WSN</div>
+    <input type="text" id="wsnInput" placeholder="Scan WSN..." autocomplete="off" onkeydown="if(event.key==='Enter') validateScannedWSN()">
+    <div class="alert alert-error" id="auditAlert" style="margin-top:10px;"></div>
+    <div class="alert alert-success" id="auditSuccess" style="margin-top:10px;"></div>
+    
+    <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+      <button class="btn btn-primary" onclick="validateScannedWSN()">Submit WSN</button>
+      <button class="btn btn-warn" style="font-size:13px; padding:10px;" onclick="forceCloseWID()">❌ WID / Location Missing (Skip)</button>
+    </div>
+  </div>
+</div>
+
+<!-- INTERACTIVE WSN ACTION MODAL -->
+<div class="modal-overlay" id="actionModal">
+  <div class="modal">
+    <h3 style="margin-bottom:8px; color:#4fd97e;">WSN Validated</h3>
+    <p style="font-size:14px; color:#8888aa; margin-bottom:14px;" id="modalWsnText">WSN: -</p>
+    <p style="font-size:13px; margin-bottom:16px;">Select condition for this specific WSN:</p>
+    
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button class="btn btn-success" onclick="confirmWSNStatus('Done', 'Verified')">✓ Verify / OK</button>
+      <button class="btn btn-danger" onclick="promptIssueForWSN()">⚠️ Report Issue</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOCATION SUMMARY POPUP MODAL -->
+<div class="modal-overlay" id="locationModal">
+  <div class="modal">
+    <h2 style="color:#f7a34f; margin-bottom:6px;">📍 Location Complete!</h2>
+    <p style="font-size:15px; font-weight:bold; color:white; margin-bottom:16px;" id="locModalName">Location: -</p>
+    
+    <div style="background:#0f0f1a; padding:12px; border-radius:10px; text-align:left; margin-bottom:18px; font-size:14px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+        <span style="color:#8888aa;">Verified OK:</span>
+        <strong style="color:#4fd97e;" id="locModalDone">0</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span style="color:#8888aa;">Issues Reported:</span>
+        <strong style="color:#f75f5f;" id="locModalIssues">0</strong>
+      </div>
+    </div>
+    
+    <button class="btn btn-primary" onclick="closeLocationModal()">Continue to Next Location →</button>
+  </div>
+</div>
+
+<!-- SUMMARY & 2D BARCODE SCREEN -->
+<div class="screen" id="screen-summary">
+  <div class="card" style="text-align:center;">
+    <h2 style="font-size:20px; color:#4fd97e;">Stock Take Complete!</h2>
+    <p style="font-size:13px; color:#8888aa; margin-top:4px;" id="summaryNotice">Scan QR code with Supervisor Scanner</p>
+    
+    <div class="barcode-wrap">
+      <div id="qrcode"></div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:10px;" id="partNavBtns">
+      <button class="btn btn-ghost" id="prevPartBtn" style="display:none;" onclick="changePart(-1)">← Prev Part</button>
+      <button class="btn btn-ghost" id="nextPartBtn" style="display:none;" onclick="changePart(1)">Next Part →</button>
+    </div>
+    
+    <div style="font-size:12px; color:#8888aa; text-align:left; background:#0f0f1a; padding:10px; border-radius:8px; margin-top:14px;" id="summaryDetails"></div>
+    <button class="btn btn-ghost" style="margin-top:16px;" onclick="clearLocalSessionAndReset()">Start New Session</button>
+  </div>
+</div>
+
+<script>
+// PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL BELOW:
+const API_URL = "https://script.google.com/a/macros/flipkart.com/s/AKfycbzKZ69yArMwfshq0pIWZCb8Uvf4bPg2YUXByFHqVtUPkiKKnq87WFoePl3g0wRmjY4GBQ/exec";
+
+let EMP_DATA = {};
+let currentEmp = '';
+let assignments = [];
+let currentIdx = 0;
+let scannedWSNs = [];
+let sessionResults = [];
+let pendingValidatedWSN = '';
+
+let currentPartIdx = 0;
+let qrPayloadParts = [];
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+async function doLogin() {
+  const inputEl = document.getElementById('empInput');
+  const code = inputEl.value.trim().toUpperCase();
+  if (!code) return showLoginErr('Please enter Employee ID');
+
+  const btn = document.getElementById('startBtn');
+  btn.textContent = 'Loading Assignments...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(API_URL);
+    EMP_DATA = await res.json();
+  } catch(e) {
+    btn.textContent = 'Start Audit';
+    btn.disabled = false;
+    return showLoginErr('Failed to connect to Google Sheets server.');
+  }
+
+  btn.textContent = 'Start Audit';
+  btn.disabled = false;
+
+  if (!EMP_DATA || !EMP_DATA[code] || !EMP_DATA[code].length) {
+    return showLoginErr('No active Stock Take assigned to Employee: ' + code);
+  }
+
+  currentEmp = code;
+  assignments = EMP_DATA[code];
+  const newBatchTid = assignments[0].tid;
+
+  const savedSession = localStorage.getItem('ST_SESSION_' + currentEmp);
+  if (savedSession) {
+    try {
+      const parsed = JSON.parse(savedSession);
+      const savedTid = (parsed.sessionResults && parsed.sessionResults.length > 0) ? parsed.sessionResults[0].tid : null;
+
+      if (savedTid && savedTid !== newBatchTid) {
+        localStorage.removeItem('ST_SESSION_' + currentEmp);
+        currentIdx = 0; scannedWSNs = []; sessionResults = [];
+      } else {
+        currentIdx = parsed.currentIdx || 0;
+        scannedWSNs = parsed.scannedWSNs || [];
+        sessionResults = parsed.sessionResults || [];
+
+        if (currentIdx >= assignments.length && sessionResults.length > 0) {
+          return renderSummary();
+        }
+      }
+    } catch(e) {
+      currentIdx = 0; scannedWSNs = []; sessionResults = [];
+    }
+  } else {
+    currentIdx = 0; scannedWSNs = []; sessionResults = [];
+  }
+
+  showScreen('screen-audit');
+  loadCurrentItem();
+}
+
+function saveLocalSession() {
+  const dataToSave = {
+    currentIdx: currentIdx,
+    scannedWSNs: scannedWSNs,
+    sessionResults: sessionResults
+  };
+  localStorage.setItem('ST_SESSION_' + currentEmp, JSON.stringify(dataToSave));
+}
+
+function showLoginErr(msg) {
+  showScreen('screen-login');
+  const el = document.getElementById('loginAlert');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function loadCurrentItem() {
+  if (currentIdx >= assignments.length) {
+    return renderSummary();
+  }
+
+  const item = assignments[currentIdx];
+  document.getElementById('dispTid').textContent = 'Stock Take ID: ' + item.tid;
+  document.getElementById('dispLoc').textContent = item.location;
+  document.getElementById('dispModel').textContent = item.model;
+  document.getElementById('dispWid').textContent = item.wid;
+  document.getElementById('dispCount').textContent = scannedWSNs.length + ' / ' + item.expectedCount;
+  
+  document.getElementById('wsnInput').value = '';
+  document.getElementById('wsnInput').focus();
+  
+  hideAlerts();
+}
+
+function hideAlerts() {
+  document.getElementById('auditAlert').style.display = 'none';
+  document.getElementById('auditSuccess').style.display = 'none';
+}
+
+function validateScannedWSN() {
+  hideAlerts();
+  const input = document.getElementById('wsnInput').value.trim().toUpperCase();
+  const item = assignments[currentIdx];
+
+  if (!input) return;
+
+  const validWSNs = item.wsns.map(w => w.toUpperCase());
+  if (!validWSNs.includes(input)) {
+    const err = document.getElementById('auditAlert');
+    err.textContent = '❌ WSN Mismatch for WID: ' + item.wid;
+    err.style.display = 'block';
+    document.getElementById('wsnInput').value = '';
+    return;
+  }
+
+  if (scannedWSNs.includes(input)) {
+    const err = document.getElementById('auditAlert');
+    err.textContent = '⚠️ WSN already scanned!';
+    err.style.display = 'block';
+    return;
+  }
+
+  pendingValidatedWSN = input;
+  document.getElementById('modalWsnText').textContent = 'WSN: ' + input + ' (' + item.model + ')';
+  document.getElementById('actionModal').style.display = 'flex';
+}
+
+function confirmWSNStatus(status, remark) {
+  document.getElementById('actionModal').style.display = 'none';
+  
+  const wsn = pendingValidatedWSN;
+  const item = assignments[currentIdx];
+
+  scannedWSNs.push(wsn);
+  sessionResults.push({ wsn: wsn, status: status, remark: remark, location: item.location, tid: item.tid });
+
+  saveLocalSession();
+
+  const succ = document.getElementById('auditSuccess');
+  succ.textContent = (status === 'Done' ? '✓ Verified: ' : '⚠️ Issue Marked: ') + wsn;
+  succ.style.display = 'block';
+
+  pendingValidatedWSN = '';
+
+  if (scannedWSNs.length >= item.expectedCount) {
+    const prevLocation = item.location;
+    currentIdx++;
+    scannedWSNs = [];
+    saveLocalSession();
+
+    const nextItem = assignments[currentIdx];
+    if (!nextItem || nextItem.location !== prevLocation) {
+      triggerLocationSummaryPopup(prevLocation);
+    } else {
+      setTimeout(loadCurrentItem, 500);
+    }
+  } else {
+    document.getElementById('dispCount').textContent = scannedWSNs.length + ' / ' + item.expectedCount;
+    document.getElementById('wsnInput').value = '';
+    document.getElementById('wsnInput').focus();
+  }
+}
+
+function forceCloseWID() {
+  const item = assignments[currentIdx];
+  if (!confirm('Mark WID ' + item.wid + ' (' + item.model + ') as Missing / Not Available?')) return;
+
+  const remark = 'Not Available / Force Closed';
+  item.wsns.forEach(w => {
+    if (!scannedWSNs.includes(w.toUpperCase())) {
+      sessionResults.push({ wsn: w, status: 'Issue', remark: remark, location: item.location, tid: item.tid });
+    }
+  });
+
+  const prevLocation = item.location;
+  currentIdx++;
+  scannedWSNs = [];
+  saveLocalSession();
+
+  const nextItem = assignments[currentIdx];
+  if (!nextItem || nextItem.location !== prevLocation) {
+    triggerLocationSummaryPopup(prevLocation);
+  } else {
+    loadCurrentItem();
+  }
+}
+
+function triggerLocationSummaryPopup(locName) {
+  const locResults = sessionResults.filter(r => r.location === locName);
+  const doneCount = locResults.filter(r => r.status === 'Done').length;
+  const issueCount = locResults.filter(r => r.status === 'Issue').length;
+
+  document.getElementById('locModalName').textContent = 'Location: ' + locName;
+  document.getElementById('locModalDone').textContent = doneCount;
+  document.getElementById('locModalIssues').textContent = issueCount;
+  document.getElementById('locationModal').style.display = 'flex';
+}
+
+function closeLocationModal() {
+  document.getElementById('locationModal').style.display = 'none';
+  loadCurrentItem();
+}
+
+function promptIssueForWSN() {
+  const remark = prompt('Describe Issue for WSN ' + pendingValidatedWSN + ':') || 'Damaged / Count Mismatch';
+  confirmWSNStatus('Issue', remark);
+}
+
+function renderSummary() {
+  showScreen('screen-summary');
+
+  const stockTakeId = assignments[0].tid;
+  const totalItems = sessionResults.length;
+
+  const chunkSize = 50;
+  qrPayloadParts = [];
+  
+  const totalChunks = Math.ceil(totalItems / chunkSize) || 1;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const chunkItems = sessionResults.slice(i * chunkSize, (i + 1) * chunkSize);
+    const recStr = chunkItems.map(r => r.wsn + ':' + r.status + ':' + r.remark).join(';');
+    const partHeader = 'P' + (i + 1) + '/' + totalChunks + '|';
+    qrPayloadParts.push(partHeader + currentEmp + '|' + stockTakeId + '|' + recStr);
+  }
+
+  currentPartIdx = 0;
+  displayQRPart(0);
+
+  document.getElementById('summaryDetails').innerHTML = 
+    '<strong>Employee:</strong> ' + currentEmp + '<br>' +
+    '<strong>Stock Take ID:</strong> ' + stockTakeId + '<br>' +
+    '<strong>Total Items Audited:</strong> ' + totalItems;
+}
+
+function displayQRPart(index) {
+  currentPartIdx = index;
+  const total = qrPayloadParts.length;
+
+  if (total > 1) {
+    document.getElementById('summaryNotice').textContent = 'Scan Part ' + (index + 1) + ' of ' + total + ' with Supervisor Scanner';
+    document.getElementById('prevPartBtn').style.display = index > 0 ? 'inline-block' : 'none';
+    document.getElementById('nextPartBtn').style.display = index < total - 1 ? 'inline-block' : 'none';
+  } else {
+    document.getElementById('summaryNotice').textContent = 'Scan this 2D Barcode with Supervisor Scanner';
+    document.getElementById('prevPartBtn').style.display = 'none';
+    document.getElementById('nextPartBtn').style.display = 'none';
+  }
+
+  const qrel = document.getElementById("qrcode");
+  qrel.innerHTML = "";
+  new QRCode(qrel, {
+    text: qrPayloadParts[index],
+    width: 250,
+    height: 250,
+    correctLevel: QRCode.CorrectLevel.L
+  });
+}
+
+function changePart(dir) {
+  const newIdx = currentPartIdx + dir;
+  if (newIdx >= 0 && newIdx < qrPayloadParts.length) {
+    displayQRPart(newIdx);
+  }
+}
+
+function clearLocalSessionAndReset() {
+  const confirmFirst = confirm(
+    "⚠️ WARNING: HAS THE SUPERVISOR SCANNED YOUR QR CODE?\n\n" +
+    "Click 'OK' ONLY if the supervisor has already scanned your QR code into Google Sheets.\n\n" +
+    "Click 'Cancel' if the QR code has NOT been scanned yet!"
+  );
+
+  if (!confirmFirst) return;
+
+  const doubleCheck = confirm("Are you 100% sure? This will delete the current QR code data permanently.");
+  if (!doubleCheck) return;
+
+  localStorage.removeItem('ST_SESSION_' + currentEmp);
+  location.reload();
+}
+
+document.getElementById('empInput').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+</script>
+</body>
+</html>
